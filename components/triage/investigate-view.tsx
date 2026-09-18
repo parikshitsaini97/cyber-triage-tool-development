@@ -1,107 +1,103 @@
-"use client"
+"use client";
 
-import { Clock, ScanSearch, ShieldCheck } from "lucide-react"
-import { timeline, findings, type Severity } from "@/lib/triage-data"
-import { Panel, PanelHeader, SeverityBadge, Chip } from "./ui"
+import { useEffect, useState } from "react";
+import { Loader2, Search, UserCheck, ShieldAlert, Clock } from "lucide-react";
 
-const dot: Record<Severity, string> = {
-  critical: "bg-[oklch(0.62_0.23_22)] shadow-[0_0_10px_oklch(0.62_0.23_22)]",
-  high: "bg-[oklch(0.8_0.16_85)] shadow-[0_0_10px_oklch(0.8_0.16_85_/_60%)]",
-  medium: "bg-[oklch(0.78_0.13_195)]",
-  low: "bg-[oklch(0.72_0.18_145)]",
-  info: "bg-muted-foreground",
-}
-
-const statusTone: Record<string, "danger" | "primary" | "success"> = {
-  Confirmed: "danger",
-  Investigating: "primary",
-  Contained: "success",
+interface InvestigationItem {
+  id: string;
+  subject: string;
+  analyst: string;
+  priority: string;
+  status: string;
+  summary: string;
 }
 
 export function InvestigateView() {
+  const [investigations, setInvestigations] = useState<InvestigationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchInvestigations() {
+      try {
+        const response = await fetch("/api/triage");
+        const data = await response.json();
+        setInvestigations(data.investigations || []);
+      } catch (error) {
+        console.error("Failed to fetch investigation telemetry:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchInvestigations();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5">
-      <div className="grid gap-5 lg:grid-cols-[1fr_1.1fr]">
-        <Panel>
-          <PanelHeader
-            title="Reconstructed Timeline"
-            desc="Correlated across disk, memory, network and logs"
-            icon={<Clock className="size-4" />}
-          />
-          <ol className="relative space-y-1 p-5">
-            <span className="absolute bottom-6 left-[27px] top-6 w-px bg-border" aria-hidden />
-            {timeline.map((ev) => (
-              <li key={ev.id} className="relative flex gap-4 py-2">
-                <span className="relative z-10 mt-1 grid size-4 shrink-0 place-items-center">
-                  <span className={`size-2.5 rounded-full ${dot[ev.severity]}`} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs text-primary">{ev.time}</span>
-                    <span className="font-mono text-[10px] text-muted-foreground">{ev.host}</span>
-                    <Chip>{ev.source}</Chip>
-                  </div>
-                  <p className="mt-1 text-sm text-foreground">{ev.event}</p>
-                  <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                    ATT&CK {ev.technique}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </Panel>
-
-        <div className="space-y-5">
-          <Panel>
-            <PanelHeader
-              title="Investigation Findings"
-              desc="Analyst conclusions with linked evidence"
-              icon={<ScanSearch className="size-4" />}
-            />
-            <ul className="divide-y divide-border">
-              {findings.map((f) => (
-                <li key={f.id} className="space-y-2 px-5 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-semibold text-foreground">{f.title}</p>
-                    <SeverityBadge severity={f.severity} />
-                  </div>
-                  <p className="text-xs leading-relaxed text-muted-foreground">{f.narrative}</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Chip tone={statusTone[f.status]}>{f.status}</Chip>
-                    <span className="font-mono text-[10px] text-muted-foreground">{f.mitre}</span>
-                    {f.evidenceRefs.map((r) => (
-                      <span
-                        key={r}
-                        className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
-                      >
-                        {r}
+    <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+      <div className="flex flex-col space-y-1.5 p-6">
+        <h3 className="text-2xl font-semibold leading-none tracking-tight flex items-center gap-2">
+          <Search className="h-5 w-5" /> Active Incident Investigations
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Assigned analyst cases, priority levels, and active containment plans fetched from <code className="text-xs bg-muted px-1 py-0.5 rounded">/api/triage</code>.
+        </p>
+      </div>
+      <div className="p-6 pt-0">
+        {investigations.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">No active cases recorded.</p>
+        ) : (
+          <div className="relative w-full overflow-auto">
+            <table className="w-full caption-bottom text-sm text-left">
+              <thead>
+                <tr className="border-b transition-colors">
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Case ID</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Subject</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Lead Analyst</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Priority</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Status</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Summary</th>
+                </tr>
+              </thead>
+              <tbody>
+                {investigations.map((item) => (
+                  <tr key={item.id} className="border-b transition-colors hover:bg-muted/50">
+                    <td className="p-4 align-middle font-mono text-xs">{item.id}</td>
+                    <td className="p-4 align-middle font-medium">{item.subject}</td>
+                    <td className="p-4 align-middle text-xs">
+                      <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <UserCheck className="h-3 w-3" /> {item.analyst}
                       </span>
-                    ))}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-
-          <Panel className="flex items-center gap-4 p-5">
-            <span className="grid size-11 shrink-0 place-items-center rounded-md bg-[oklch(0.72_0.18_145_/_15%)] text-[oklch(0.78_0.18_145)]">
-              <ShieldCheck className="size-5" />
-            </span>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-foreground">Case ready for reporting</p>
-              <p className="text-xs text-muted-foreground">
-                Kill chain reconstructed · 4 findings documented · chain of custody intact
-              </p>
-            </div>
-            <button
-              type="button"
-              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-            >
-              Generate Report
-            </button>
-          </Panel>
-        </div>
+                    </td>
+                    <td className="p-4 align-middle">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${item.priority === "Critical"
+                        ? "bg-red-500/15 text-red-500"
+                        : "bg-orange-500/15 text-orange-500"
+                        }`}>
+                        <ShieldAlert className="h-3 w-3" /> {item.priority}
+                      </span>
+                    </td>
+                    <td className="p-4 align-middle">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-secondary text-secondary-foreground px-2.5 py-0.5 text-xs font-semibold">
+                        <Clock className="h-3 w-3" /> {item.status}
+                      </span>
+                    </td>
+                    <td className="p-4 align-middle text-xs text-muted-foreground max-w-[280px] truncate">
+                      {item.summary}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
-  )
+  );
 }

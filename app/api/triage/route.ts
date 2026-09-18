@@ -92,6 +92,24 @@ export async function GET() {
                 threat: "Custom Reverse Shell Payload",
                 status: "blocked"
             }
+        ],
+        investigations: [
+            {
+                id: "INV-501",
+                subject: "DC01 Lateral Access via WinRM",
+                analyst: "Parikshit Saini",
+                priority: "Critical",
+                status: "In Progress",
+                summary: "Suspicious WinRM connection initiated from WS-FINANCE-04 targeting DC01-MAIN using harvested domain credentials."
+            },
+            {
+                id: "INV-502",
+                subject: "LSASS Process Memory Inspection",
+                analyst: "Parikshit Saini",
+                priority: "High",
+                status: "Containment Pending",
+                summary: "Extracted memory dump contains credential dumping signatures. Host isolation recommended."
+            }
         ]
     });
 }
