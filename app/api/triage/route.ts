@@ -69,6 +69,29 @@ export async function GET() {
                 size: "84 KB",
                 flagged: false
             }
+        ],
+        iocs: [
+            {
+                id: "IOC-301",
+                type: "IPv4 Address",
+                value: "185.220.101.5",
+                threat: "Cobalt Strike C2 Node",
+                status: "active"
+            },
+            {
+                id: "IOC-302",
+                type: "Domain",
+                value: "update-service-auth.com",
+                threat: "Exfiltration Endpoint",
+                status: "blocked"
+            },
+            {
+                id: "IOC-303",
+                type: "SHA-256",
+                value: "4a8a08f09d37b73795649038408b5f33fe7ed5802f4fc01861e38b3463991206",
+                threat: "Custom Reverse Shell Payload",
+                status: "blocked"
+            }
         ]
     });
 }

@@ -1,121 +1,97 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Waypoints, Crosshair, Globe, Binary, KeyRound, Database, Mail, ArrowRight, type LucideIcon } from "lucide-react"
-import { iocs, correlations, type Ioc } from "@/lib/triage-data"
-import { Panel, PanelHeader, SeverityBadge, Meter, Chip } from "./ui"
+import { useEffect, useState } from "react";
+import { Loader2, Network, ShieldAlert, CheckCircle2 } from "lucide-react";
 
-const typeIcon: Record<Ioc["type"], LucideIcon> = {
-  IPv4: Globe,
-  Domain: Globe,
-  "SHA-256": Binary,
-  Mutex: KeyRound,
-  Registry: Database,
-  Email: Mail,
+interface IOCItem {
+  id: string;
+  type: string;
+  value: string;
+  threat: string;
+  status: "active" | "blocked";
 }
 
 export function CorrelateView() {
-  const [selected, setSelected] = useState<string | null>(null)
-  const iocById = (id: string) => iocs.find((i) => i.id === id)
+  const [iocs, setIocs] = useState<IOCItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchIocs() {
+      try {
+        const response = await fetch("/api/triage");
+        const data = await response.json();
+        setIocs(data.iocs || []);
+      } catch (error) {
+        console.error("Failed to fetch IOC correlation telemetry:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchIocs();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-5">
-      <div className="grid gap-5 lg:grid-cols-[1.7fr_1fr]">
-        <Panel>
-          <PanelHeader
-            title="Indicators of Compromise"
-            desc="Enriched with threat intel and mapped to MITRE ATT&CK"
-            icon={<Crosshair className="size-4" />}
-          />
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+    <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+      <div className="flex flex-col space-y-1.5 p-6">
+        <h3 className="text-2xl font-semibold leading-none tracking-tight flex items-center gap-2">
+          <Network className="h-5 w-5" /> IOC Correlation
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Correlated indicators of compromise cross-referenced against threat intelligence feeds via <code className="text-xs bg-muted px-1 py-0.5 rounded">/api/triage</code>.
+        </p>
+      </div>
+      <div className="p-6 pt-0">
+        {iocs.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">No correlated IOCs recorded.</p>
+        ) : (
+          <div className="relative w-full overflow-auto">
+            <table className="w-full caption-bottom text-sm text-left">
               <thead>
-                <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-5 py-2.5 font-medium">Indicator</th>
-                  <th className="px-3 py-2.5 font-medium">Type</th>
-                  <th className="px-3 py-2.5 font-medium">MITRE</th>
-                  <th className="px-3 py-2.5 font-medium">Hits</th>
-                  <th className="px-3 py-2.5 font-medium">Confidence</th>
-                  <th className="px-5 py-2.5 font-medium">Severity</th>
+                <tr className="border-b transition-colors">
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">IOC ID</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Type</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Indicator Value</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Associated Threat</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Mitigation Status</th>
                 </tr>
               </thead>
               <tbody>
-                {iocs.map((ioc) => {
-                  const Icon = typeIcon[ioc.type]
-                  const active = selected === ioc.id
-                  return (
-                    <tr
-                      key={ioc.id}
-                      onClick={() => setSelected(active ? null : ioc.id)}
-                      className={
-                        "cursor-pointer border-b border-border/60 transition-colors " +
-                        (active ? "bg-primary/5" : "hover:bg-accent/40")
-                      }
-                    >
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <Icon className="size-4 text-muted-foreground" />
-                          <span className="font-mono text-xs text-foreground">{ioc.indicator}</span>
-                          {ioc.enriched ? <Chip tone="primary">enriched</Chip> : null}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-xs text-muted-foreground">{ioc.type}</td>
-                      <td className="px-3 py-3">
-                        <span className="font-mono text-xs text-foreground">{ioc.mitre}</span>
-                        <span className="block text-[10px] text-muted-foreground">{ioc.mitreName}</span>
-                      </td>
-                      <td className="px-3 py-3 font-mono text-xs text-foreground">{ioc.hits}</td>
-                      <td className="px-3 py-3">
-                        <div className="flex items-center gap-2">
-                          <Meter value={ioc.confidence} className="w-14" />
-                          <span className="font-mono text-[11px] text-muted-foreground">
-                            {ioc.confidence}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3">
-                        <SeverityBadge severity={ioc.severity} />
-                      </td>
-                    </tr>
-                  )
-                })}
+                {iocs.map((item) => (
+                  <tr key={item.id} className="border-b transition-colors hover:bg-muted/50">
+                    <td className="p-4 align-middle font-mono text-xs">{item.id}</td>
+                    <td className="p-4 align-middle">
+                      <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground">
+                        {item.type}
+                      </span>
+                    </td>
+                    <td className="p-4 align-middle font-mono text-xs max-w-[220px] truncate">{item.value}</td>
+                    <td className="p-4 align-middle font-medium">{item.threat}</td>
+                    <td className="p-4 align-middle">
+                      {item.status === "active" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 text-red-500 px-2.5 py-0.5 text-xs font-semibold">
+                          <ShieldAlert className="h-3 w-3" /> Active Threat
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-500 px-2.5 py-0.5 text-xs font-semibold">
+                          <CheckCircle2 className="h-3 w-3" /> Blocked
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-        </Panel>
-
-        <Panel>
-          <PanelHeader
-            title="Attack Correlation"
-            desc="Automatically inferred relationships between indicators"
-            icon={<Waypoints className="size-4" />}
-          />
-          <div className="space-y-3 p-5">
-            {correlations.map((link) => {
-              const from = iocById(link.from)
-              const to = iocById(link.to)
-              return (
-                <div key={link.id} className="rounded-md border border-border bg-background/40 p-3">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="min-w-0 flex-1 truncate font-mono text-foreground">
-                      {from?.indicator}
-                    </span>
-                    <ArrowRight className="size-3.5 shrink-0 text-primary" />
-                    <span className="min-w-0 flex-1 truncate text-right font-mono text-foreground">
-                      {to?.indicator}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-[11px] text-muted-foreground">{link.relation}</span>
-                    <span className="font-mono text-[11px] text-primary">{link.strength}%</span>
-                  </div>
-                  <Meter className="mt-1.5" value={link.strength} />
-                </div>
-              )
-            })}
-          </div>
-        </Panel>
+        )}
       </div>
     </div>
-  )
+  );
 }
