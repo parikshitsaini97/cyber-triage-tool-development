@@ -1,209 +1,113 @@
-"use client"
+"use client";
 
-import {
-  HardDriveDownload,
-  Crosshair,
-  FileSearch,
-  Clock,
-  ArrowRight,
-  ShieldAlert,
-  CircleCheck,
-} from "lucide-react"
-import {
-  caseInfo,
-  evidence,
-  iocs,
-  artifacts,
-  timeline,
-  findings,
-  pipelineStages,
-  type StageId,
-} from "@/lib/triage-data"
-import { Panel, PanelHeader, SeverityBadge, Meter, Chip } from "./ui"
+import { useEffect, useState } from "react";
+import { Loader2, Activity, HardDrive, ShieldAlert, FileCode, Network, Search } from "lucide-react";
 
-function ThreatGauge({ score }: { score: number }) {
-  const r = 52
-  const c = 2 * Math.PI * r
-  const offset = c - (score / 100) * c
-  return (
-    <div className="relative grid size-36 place-items-center">
-      <svg className="size-36 -rotate-90" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r={r} fill="none" stroke="oklch(0.27 0.02 248)" strokeWidth="10" />
-        <circle
-          cx="60"
-          cy="60"
-          r={r}
-          fill="none"
-          stroke="oklch(0.62 0.23 22)"
-          strokeWidth="10"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-        />
-      </svg>
-      <div className="absolute text-center">
-        <p className="font-mono text-3xl font-bold text-foreground">{score}</p>
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Threat Score</p>
-      </div>
-    </div>
-  )
+interface OverviewData {
+  evidenceCount: number;
+  threatCount: number;
+  flaggedArtifacts: number;
+  activeIocs: number;
+  openCases: number;
 }
 
-const stats = [
-  { label: "Evidence Items", value: evidence.length, sub: "sources acquired", icon: HardDriveDownload },
-  { label: "Active IOCs", value: iocs.length, sub: "indicators tracked", icon: Crosshair },
-  { label: "Flagged Artifacts", value: artifacts.filter((a) => a.flagged).length, sub: "require review", icon: FileSearch },
-  { label: "Timeline Events", value: timeline.length, sub: "reconstructed", icon: Clock },
-]
+export function OverviewView() {
+  const [stats, setStats] = useState<OverviewData>({
+    evidenceCount: 0,
+    threatCount: 0,
+    flaggedArtifacts: 0,
+    activeIocs: 0,
+    openCases: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
-export function OverviewView({ onNavigate }: { onNavigate: (id: StageId) => void }) {
-  const completed = evidence.filter((e) => e.status === "Verified").length
+  useEffect(() => {
+    async function fetchOverview() {
+      try {
+        const response = await fetch("/api/triage");
+        const data = await response.json();
+
+        setStats({
+          evidenceCount: data.evidence?.length || 0,
+          threatCount: data.classifications?.filter((c: any) => c.severity === "critical" || c.severity === "high").length || 0,
+          flaggedArtifacts: data.artifacts?.filter((a: any) => a.flagged).length || 0,
+          activeIocs: data.iocs?.filter((i: any) => i.status === "active").length || 0,
+          openCases: data.investigations?.length || 0,
+        });
+      } catch (error) {
+        console.error("Failed to fetch triage overview metrics:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchOverview();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5">
-      <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
-        <Panel className="overflow-hidden">
-          <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
-            <ThreatGauge score={caseInfo.threatScore} />
-            <div className="min-w-0 flex-1 space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <SeverityBadge severity={caseInfo.priority} />
-                <Chip tone="danger">{caseInfo.status}</Chip>
-                <Chip>{caseInfo.lead}</Chip>
-              </div>
-              <p className="text-sm leading-relaxed text-muted-foreground">{caseInfo.summary}</p>
-              <div className="grid grid-cols-2 gap-3 pt-1 text-xs">
-                <div>
-                  <p className="text-muted-foreground">Subject Host</p>
-                  <p className="font-mono text-foreground">{caseInfo.subjectHost}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Opened</p>
-                  <p className="font-mono text-foreground">{caseInfo.opened}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Panel>
-
-        <Panel>
-          <PanelHeader title="Triage Pipeline" desc="Progress across investigation stages" />
-          <div className="space-y-1 p-3">
-            {pipelineStages.map((stage, i) => {
-              const done = i < 3
-              const current = i === 3
-              return (
-                <button
-                  key={stage.id}
-                  type="button"
-                  onClick={() => onNavigate(stage.id)}
-                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-accent/50"
-                >
-                  <span
-                    className={
-                      done
-                        ? "grid size-7 place-items-center rounded-full bg-[oklch(0.72_0.18_145_/_15%)] text-[oklch(0.78_0.18_145)]"
-                        : current
-                          ? "grid size-7 place-items-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/40"
-                          : "grid size-7 place-items-center rounded-full bg-muted text-muted-foreground"
-                    }
-                  >
-                    {done ? <CircleCheck className="size-4" /> : <span className="font-mono text-xs">{i + 1}</span>}
-                  </span>
-                  <span className="flex-1">
-                    <span className="block text-sm text-foreground">{stage.label}</span>
-                    <span className="block text-xs text-muted-foreground">{stage.blurb}</span>
-                  </span>
-                  <ArrowRight className="size-4 text-muted-foreground" />
-                </button>
-              )
-            })}
-          </div>
-        </Panel>
+    <div className="space-y-6">
+      <div className="rounded-xl border bg-card p-6 shadow-sm">
+        <h3 className="text-2xl font-semibold leading-none tracking-tight flex items-center gap-2 mb-2">
+          <Activity className="h-5 w-5 text-emerald-500" /> Command Center Overview
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Real-time summary metrics compiled across all active DFIR triage pipeline stages.
+        </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s) => (
-          <Panel key={s.label} className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="grid size-9 place-items-center rounded-md bg-primary/10 text-primary">
-                <s.icon className="size-4.5" />
-              </span>
-              <span className="font-mono text-2xl font-bold text-foreground">{s.value}</span>
-            </div>
-            <p className="mt-3 text-sm font-medium text-foreground">{s.label}</p>
-            <p className="text-xs text-muted-foreground">{s.sub}</p>
-          </Panel>
-        ))}
-      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Total Evidence</span>
+            <HardDrive className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="text-2xl font-bold mt-2">{stats.evidenceCount}</div>
+          <p className="text-xs text-muted-foreground mt-1">Ingested items</p>
+        </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
-        <Panel>
-          <PanelHeader
-            title="Key Findings"
-            desc="Confirmed activity along the kill chain"
-            icon={<ShieldAlert className="size-4" />}
-            action={
-              <button
-                type="button"
-                onClick={() => onNavigate("investigate")}
-                className="text-xs font-medium text-primary hover:underline"
-              >
-                View all
-              </button>
-            }
-          />
-          <ul className="divide-y divide-border">
-            {findings.map((f) => (
-              <li key={f.id} className="flex items-start gap-3 px-5 py-3">
-                <SeverityBadge severity={f.severity} className="mt-0.5" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">{f.title}</p>
-                  <p className="font-mono text-[11px] text-muted-foreground">
-                    {f.mitre} · {f.status}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Panel>
+        <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">High/Critical</span>
+            <ShieldAlert className="h-4 w-4 text-red-500" />
+          </div>
+          <div className="text-2xl font-bold mt-2 text-red-500">{stats.threatCount}</div>
+          <p className="text-xs text-muted-foreground mt-1">Rules triggered</p>
+        </div>
 
-        <Panel>
-          <PanelHeader
-            title="Acquisition Status"
-            desc={`${completed} of ${evidence.length} sources verified`}
-            icon={<HardDriveDownload className="size-4" />}
-            action={
-              <button
-                type="button"
-                onClick={() => onNavigate("evidence")}
-                className="text-xs font-medium text-primary hover:underline"
-              >
-                Manage
-              </button>
-            }
-          />
-          <ul className="space-y-3 p-5">
-            {evidence.slice(0, 5).map((e) => (
-              <li key={e.id} className="space-y-1.5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="truncate text-foreground">{e.label}</span>
-                  <span className="font-mono text-xs text-muted-foreground">{e.progress}%</span>
-                </div>
-                <Meter
-                  value={e.progress}
-                  tone={
-                    e.status === "Integrity Failed"
-                      ? "danger"
-                      : e.status === "Acquiring"
-                        ? "amber"
-                        : "success"
-                  }
-                />
-              </li>
-            ))}
-          </ul>
-        </Panel>
+        <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Flagged Files</span>
+            <FileCode className="h-4 w-4 text-orange-500" />
+          </div>
+          <div className="text-2xl font-bold mt-2 text-orange-500">{stats.flaggedArtifacts}</div>
+          <p className="text-xs text-muted-foreground mt-1">Suspicious paths</p>
+        </div>
+
+        <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Active IOCs</span>
+            <Network className="h-4 w-4 text-yellow-500" />
+          </div>
+          <div className="text-2xl font-bold mt-2 text-yellow-500">{stats.activeIocs}</div>
+          <p className="text-xs text-muted-foreground mt-1">Unmitigated feeds</p>
+        </div>
+
+        <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Open Cases</span>
+            <Search className="h-4 w-4 text-blue-500" />
+          </div>
+          <div className="text-2xl font-bold mt-2 text-blue-500">{stats.openCases}</div>
+          <p className="text-xs text-muted-foreground mt-1">Active investigations</p>
+        </div>
       </div>
     </div>
-  )
+  );
 }
