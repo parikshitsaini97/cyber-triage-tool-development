@@ -43,6 +43,32 @@ export async function GET() {
                 confidence: 84,
                 description: "WinRM remote session established with non-standard admin privileges."
             }
+        ],
+        artifacts: [
+            {
+                id: "ART-101",
+                name: "lsass_dump.dmp",
+                path: "C:\\Windows\\System32\\lsass.exe",
+                type: "Process Memory",
+                size: "142 MB",
+                flagged: true
+            },
+            {
+                id: "ART-102",
+                name: "powershell_history.txt",
+                path: "C:\\Users\\Administrator\\AppData\\Roaming\\PowerShell\\...",
+                type: "Command Log",
+                size: "12 KB",
+                flagged: true
+            },
+            {
+                id: "ART-103",
+                name: "netuse_exec.sys",
+                path: "C:\\Windows\\Temp\\netuse_exec.sys",
+                type: "Driver Artifact",
+                size: "84 KB",
+                flagged: false
+            }
         ]
     });
 }

@@ -1,98 +1,100 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import {
-  FileSearch,
-  Mail,
-  Binary,
-  KeyRound,
-  Globe,
-  Database,
-  FileText,
-  Flag,
-  type LucideIcon,
-} from "lucide-react"
-import { artifacts } from "@/lib/triage-data"
-import { Panel, PanelHeader, SeverityBadge, Chip } from "./ui"
+import { useEffect, useState } from "react";
+import { Loader2, FileCode, AlertTriangle, CheckCircle2 } from "lucide-react";
 
-const catIcon: Record<string, LucideIcon> = {
-  Email: Mail,
-  Executable: Binary,
-  Credentials: KeyRound,
-  Browser: Globe,
-  Registry: Database,
-  Document: FileText,
+interface ArtifactItem {
+  id: string;
+  name: string;
+  path: string;
+  type: string;
+  size: string;
+  flagged: boolean;
 }
 
-const filters = ["All", "Flagged", "Email", "Executable", "Credentials", "Browser", "Registry", "Document"]
-
 export function ExtractView() {
-  const [filter, setFilter] = useState("All")
+  const [artifacts, setArtifacts] = useState<ArtifactItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const visible = artifacts.filter((a) => {
-    if (filter === "All") return true
-    if (filter === "Flagged") return a.flagged
-    return a.category === filter
-  })
+  useEffect(() => {
+    async function fetchArtifacts() {
+      try {
+        const response = await fetch("/api/triage");
+        const data = await response.json();
+        setArtifacts(data.artifacts || []);
+      } catch (error) {
+        console.error("Failed to fetch extracted artifacts:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchArtifacts();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-5">
-      <Panel>
-        <PanelHeader
-          title="Artifact Extraction"
-          desc="Recovered emails, binaries, credentials, deleted files and web activity"
-          icon={<FileSearch className="size-4" />}
-        />
-        <div className="flex flex-wrap gap-2 border-b border-border px-5 py-3">
-          {filters.map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFilter(f)}
-              className={
-                filter === f
-                  ? "rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground"
-                  : "rounded-md border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
-              }
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-
-        <ul className="divide-y divide-border">
-          {visible.map((a) => {
-            const Icon = catIcon[a.category] ?? FileText
-            return (
-              <li key={a.id} className="flex items-start gap-3 px-5 py-4">
-                <span className="grid size-9 shrink-0 place-items-center rounded-md bg-accent text-accent-foreground">
-                  <Icon className="size-4.5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate font-mono text-sm text-foreground">{a.title}</span>
-                    {a.flagged ? (
-                      <Chip tone="danger">
-                        <Flag className="size-3" /> flagged
-                      </Chip>
-                    ) : null}
-                  </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{a.detail}</p>
-                  <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                    {a.source} · {a.timestamp}
-                  </p>
-                </div>
-                <SeverityBadge severity={a.severity} />
-              </li>
-            )
-          })}
-        </ul>
-        {visible.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-            No artifacts in this category.
-          </p>
-        ) : null}
-      </Panel>
+    <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+      <div className="flex flex-col space-y-1.5 p-6">
+        <h3 className="text-2xl font-semibold leading-none tracking-tight flex items-center gap-2">
+          <FileCode className="h-5 w-5" /> Artifact Extraction
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Extracted forensic strings, registry hives, and execution trails ingested from <code className="text-xs bg-muted px-1 py-0.5 rounded">/api/triage</code>.
+        </p>
+      </div>
+      <div className="p-6 pt-0">
+        {artifacts.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">No extracted artifacts recorded.</p>
+        ) : (
+          <div className="relative w-full overflow-auto">
+            <table className="w-full caption-bottom text-sm text-left">
+              <thead>
+                <tr className="border-b transition-colors">
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">ID</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Artifact Name</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">System Path</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Type</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Size</th>
+                  <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {artifacts.map((item) => (
+                  <tr key={item.id} className="border-b transition-colors hover:bg-muted/50">
+                    <td className="p-4 align-middle font-mono text-xs">{item.id}</td>
+                    <td className="p-4 align-middle font-medium">{item.name}</td>
+                    <td className="p-4 align-middle font-mono text-xs max-w-[220px] truncate">{item.path}</td>
+                    <td className="p-4 align-middle">
+                      <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground">
+                        {item.type}
+                      </span>
+                    </td>
+                    <td className="p-4 align-middle font-mono text-xs">{item.size}</td>
+                    <td className="p-4 align-middle">
+                      {item.flagged ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 text-red-500 px-2.5 py-0.5 text-xs font-semibold">
+                          <AlertTriangle className="h-3 w-3" /> Flagged
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-500 px-2.5 py-0.5 text-xs font-semibold">
+                          <CheckCircle2 className="h-3 w-3" /> Clean
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
-  )
+  );
 }
